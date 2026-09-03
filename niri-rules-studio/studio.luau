@@ -76,10 +76,6 @@ local function configuredPaths()
     }
 end
 
-local function shellQuote(value)
-    return "'" .. tostring(value):gsub("'", "'\\\"'\\\"'") .. "'"
-end
-
 local function kdlQuote(value)
     local text = tostring(value or "")
     text = text:gsub("\\", "\\\\")
@@ -279,7 +275,7 @@ local function persistRules(onSuccess, onFailure)
     state.loading = true
     state.status = tr("validating")
     panel.render(renderApp())
-    noctalia.runAsync("niri validate -c " .. shellQuote(paths.candidateConfig), function(result)
+    local started = noctalia.runAsync({ "niri", "validate", "-c", paths.candidateConfig }, function(result)
         state.loading = false
         noctalia.removeFile(paths.candidateConfig)
         if result.exitCode ~= 0 then
@@ -343,6 +339,11 @@ local function persistRules(onSuccess, onFailure)
         if onSuccess then onSuccess() end
         panel.render(renderApp())
     end)
+    if not started then
+        noctalia.removeFile(paths.candidateConfig)
+        noctalia.removeFile(paths.candidateRules)
+        fail(tr("error_start_command", { command = "niri validate" }))
+    end
 end
 
 -- Select options and Niri IPC snapshots used by the panel.
@@ -411,7 +412,7 @@ local function loadInspector()
     end
 
     -- Noctalia bounds concurrent subprocesses per plugin. Run these short IPC
-    -- requests in sequence so every callback is guaranteed to complete.
+    -- In other words - Query Niri for the data needed by the window inspector, then render it.
     requestJson("niri msg -j windows", function(windows, windowsErr)
         if type(windows) == "table" then state.openWindows = windows else rememberError(windowsErr) end
         requestJson("niri msg -j workspaces", function(workspaces, workspacesErr)
@@ -499,7 +500,7 @@ local function saveEditor()
             state.page = "rules"
         end,
         function()
-            -- Keep a rejected candidate as an editor draft, not a managed rule.
+            -- Keep a rejected candidate as an editor draft, not a managed rule while it's being edited.
             if editingIndex then
                 state.rules[editingIndex] = previousRule
             else
@@ -525,7 +526,7 @@ function onOpen()
 end
 
 function onClose()
-    -- Start after the panel closes so its click cannot select a window.
+    -- Start after the panel closes so its click cannot select a window just for safe.
     if not state.pendingPick then return end
     state.pendingPick = false
     requestJson("niri msg -j pick-window", function(value, err)
@@ -543,6 +544,8 @@ function onClose()
         noctalia.togglePanel(PANEL_ID)
     end)
 end
+
+-- Call all the functions for panels
 
 function refreshFocusedWindow() loadInspector() end
 function openNewRule() startNewRule() end
@@ -626,7 +629,7 @@ function chooseOpenWindow(index)
     panel.render(renderApp())
 end
 
--- Panel views.
+-- Panel views rendering aproach
 function renderApp()
     local nav = ui.row({ gap = 6 }, {
         ui.button({ text = tr("inspect"), variant = state.page == "inspect" and "primary" or "ghost", onClick = "showInspector" }),

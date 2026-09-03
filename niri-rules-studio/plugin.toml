@@ -1,7 +1,7 @@
 id = "setyvii/niri-rules-studio"
 name = "Niri Rules Studio"
 version = "0.1.0"
-plugin_api = 15
+plugin_api = 24
 author = "SetyVII"
 license = "MIT"
 icon = "adjustments-horizontal"
