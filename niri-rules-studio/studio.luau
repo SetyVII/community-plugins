@@ -529,7 +529,7 @@ local function requestJson(command, callback)
         callback(decoded, err)
     end)
     if not started then
-        callback(nil, tr("error_start_command", { command = command }))
+        callback(nil, tr("error_start_command", { command = table.concat(command, " ") }))
     end
 end
 
@@ -566,18 +566,18 @@ local function loadInspector()
 
     -- Noctalia bounds concurrent subprocesses per plugin. Run these short IPC
     -- In other words - Query Niri for the data needed by the window inspector, then render it.
-    requestJson("niri msg -j windows", function(windows, windowsErr)
+    requestJson({ "niri", "msg", "-j", "windows" }, function(windows, windowsErr)
         if type(windows) == "table" then state.openWindows = windows else rememberError(windowsErr) end
-        requestJson("niri msg -j workspaces", function(workspaces, workspacesErr)
+        requestJson({ "niri", "msg", "-j", "workspaces" }, function(workspaces, workspacesErr)
             if type(workspaces) == "table" then state.workspaces = workspaces else rememberError(workspacesErr) end
-            requestJson("niri msg -j outputs", function(outputs, outputsErr)
+            requestJson({ "niri", "msg", "-j", "outputs" }, function(outputs, outputsErr)
                 if type(outputs) == "table" then
                     for name, _ in pairs(outputs) do table.insert(state.outputs, name) end
                     table.sort(state.outputs)
                 else
                     rememberError(outputsErr)
                 end
-                requestJson("niri msg -j focused-window", function(focused, focusedErr)
+                requestJson({ "niri", "msg", "-j", "focused-window" }, function(focused, focusedErr)
                     rememberError(focusedErr)
                     state.window = resolveActiveWindow(focused)
                     state.loading = false
@@ -689,7 +689,7 @@ function onClose()
     -- Start after the panel closes so its click cannot select a window just for safe.
     if not state.pendingPick then return end
     state.pendingPick = false
-    requestJson("niri msg -j pick-window", function(value, err)
+    requestJson({ "niri", "msg", "-j", "pick-window" }, function(value, err)
         state.loading = false
         if value then
             state.window = value
